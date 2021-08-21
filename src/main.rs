@@ -1,7 +1,7 @@
 fn main() {
     let args = clap::App::new("dxf2svg")
-        .arg(clap::Arg::with_name("dxf"))
-        .arg(clap::Arg::with_name("svg"))
+        .arg(clap::Arg::with_name("dxf").required(true))
+        .arg(clap::Arg::with_name("svg").required(true))
         .get_matches();
     let path = args.value_of("dxf").unwrap();
     let drawing = dxf::Drawing::load_file(path).unwrap();
