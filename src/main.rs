@@ -7,8 +7,16 @@ fn main() {
         .get_matches();
     let path = args.value_of("dxf").unwrap();
     let drawing = dxf::Drawing::load_file(path).unwrap();
-    std::fs::write("from_dxf.json", serde_json::to_string(&drawing).unwrap()).unwrap();
-    std::fs::write("from_dxf.yaml", serde_yaml::to_string(&drawing).unwrap()).unwrap();
+    std::fs::write(
+        "data/from_dxf.json",
+        serde_json::to_string(&drawing).unwrap(),
+    )
+    .unwrap();
+    std::fs::write(
+        "data/from_dxf.yaml",
+        serde_yaml::to_string(&drawing).unwrap(),
+    )
+    .unwrap();
     let view_box = {
         let min = &drawing.header.minimum_drawing_limits;
         let max = &drawing.header.maximum_drawing_limits;
@@ -110,7 +118,7 @@ fn draw_line(
     line: &dxf::entities::Line,
     transform: impl Fn(&dxf::Point) -> dxf::Point,
 ) -> svg::Document {
-    line_strip(svg, &[transform(&line.p1), transform(&line.p2)])
+    line_strip(svg, &[transform(&line.p1), transform(&line.p2)], None)
 }
 
 fn draw_polyline(
@@ -123,7 +131,7 @@ fn draw_polyline(
         .iter()
         .map(|v| transform(&v.location))
         .collect::<Vec<_>>();
-    line_strip(svg, &points)
+    line_strip(svg, &points, None)
 }
 
 fn draw_rotated_dimension(
@@ -156,10 +164,15 @@ fn draw_rotated_dimension(
             transform(p1),
             transform(p3),
         ],
+        Some("blue"),
     )
 }
 
-fn line_strip(svg: svg::Document, pol: &[dxf::Point]) -> svg::Document {
+fn line_strip(
+    svg: svg::Document,
+    pol: &[dxf::Point],
+    color: Option<&'static str>,
+) -> svg::Document {
     if pol.len() >= 2 {
         let data = svg::node::element::path::Data::new().move_to((pol[0].x, pol[0].y));
         let data = (1..pol.len())
@@ -167,7 +180,7 @@ fn line_strip(svg: svg::Document, pol: &[dxf::Point]) -> svg::Document {
             .fold(data, |data, v| data.line_by(v));
         let path = svg::node::element::Path::new()
             .set("fill", "none")
-            .set("stroke", "black")
+            .set("stroke", color.unwrap_or("black"))
             .set("stroke-width", 1)
             .set("d", data);
         svg.add(path)
