@@ -1,3 +1,5 @@
+mod geom2d;
+
 fn main() {
     let args = clap::App::new("dxf2svg")
         .arg(clap::Arg::with_name("dxf").required(true))
@@ -85,48 +87,9 @@ fn draw_entities(
                 svg = draw_polyline(svg, pol, transform);
             }
             dxf::entities::EntityType::RotatedDimension(dim) => {
-                // println!("{:?}", dim);
-                println!("RotatedDimension: rotation_angle = {}", dim.rotation_angle);
-                println!(
-                    "attachment_point = {:?}",
-                    dim.dimension_base.attachment_point
-                );
-                let p1 = dim.dimension_base.definition_point_1.clone();
-                let p4 = dxf::Point {
-                    x: p1.x + (dim.definition_point_2.x - dim.definition_point_3.x),
-                    y: p1.y + (dim.definition_point_2.y - dim.definition_point_3.y),
-                    z: 0.0,
-                };
-                // svg = line_strip(
-                //     svg,
-                //     &[
-                //         transform(&dim.insertion_point),
-                //         transform(&dim.dimension_base.definition_point_1),
-                //     ],
-                // );
-                svg = line_strip(
-                    svg,
-                    &[
-                        transform(&dim.definition_point_2),
-                        transform(&p4),
-                        transform(&p1),
-                        transform(&dim.definition_point_3),
-                    ],
-                );
+                svg = draw_rotated_dimension(svg, dim, transform);
             }
-            // dxf::entities::EntityType::RadialDimension(dim) => {
-            //     println!("{:?}", dim);
-            // }
-            // dxf::entities::EntityType::DiameterDimension(dim) => {
-            //     println!("{:?}", dim);
-            // }
-            // dxf::entities::EntityType::AngularThreePointDimension(dim) => {
-            //     println!("{:?}", dim);
-            // }
-            // dxf::entities::EntityType::OrdinateDimension(dim) => {
-            //     println!("{:?}", dim);
-            // }
-            _ => (),
+            _ => println!("{:?}", e.specific),
         }
     }
     svg
@@ -151,6 +114,39 @@ fn draw_polyline(
         .map(|v| transform(&v.location))
         .collect::<Vec<_>>();
     line_strip(svg, &points)
+}
+
+fn draw_rotated_dimension(
+    svg: svg::Document,
+    dim: &dxf::entities::RotatedDimension,
+    transform: impl Fn(&dxf::Point) -> dxf::Point,
+) -> svg::Document {
+    let p1 = &dim.dimension_base.definition_point_1;
+    let p2 = &dim.definition_point_2;
+    let p3 = &dim.definition_point_3;
+    let p4 = {
+        let theta = dim.rotation_angle * std::f64::consts::PI / 180.0;
+        let line1 = geom2d::Line {
+            p: p1.into(),
+            v: geom2d::UnitVec::of_angle(theta),
+        };
+        let line2 = geom2d::Line {
+            p: p2.into(),
+            v: (geom2d::Pos::from(p1) - geom2d::Pos::from(p3))
+                .normalize()
+                .unwrap(),
+        };
+        line1.intersection_pos(&line2).unwrap()
+    };
+    line_strip(
+        svg,
+        &[
+            transform(p2),
+            transform(&p4.into()),
+            transform(p1),
+            transform(p3),
+        ],
+    )
 }
 
 fn line_strip(svg: svg::Document, pol: &[dxf::Point]) -> svg::Document {
