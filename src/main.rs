@@ -5,6 +5,8 @@ fn main() {
         .get_matches();
     let path = args.value_of("dxf").unwrap();
     let drawing = dxf::Drawing::load_file(path).unwrap();
+    std::fs::write("from_dxf.json", serde_json::to_string(&drawing).unwrap()).unwrap();
+    std::fs::write("from_dxf.yaml", serde_yaml::to_string(&drawing).unwrap()).unwrap();
     let view_box = {
         let min = &drawing.header.minimum_drawing_limits;
         let max = &drawing.header.maximum_drawing_limits;
@@ -50,11 +52,19 @@ fn draw_entities(
                         (theta.cos(), theta.sin())
                     };
                     let transform = |p: &dxf::Point| {
-                        let x = cos * p.x - sin * p.y;
-                        let y = sin * p.x + cos * p.y;
                         let p = dxf::Point {
-                            x: insert.location.x + x,
-                            y: insert.location.y + y,
+                            x: insert.x_scale_factor * p.x,
+                            y: insert.y_scale_factor * p.y,
+                            z: insert.z_scale_factor * p.z,
+                        };
+                        let p = dxf::Point {
+                            x: cos * p.x - sin * p.y,
+                            y: sin * p.x + cos * p.y,
+                            z: p.z,
+                        };
+                        let p = dxf::Point {
+                            x: insert.location.x + p.x,
+                            y: insert.location.y + p.y,
                             z: insert.location.z + p.z,
                         };
                         transform(&p)
@@ -74,6 +84,48 @@ fn draw_entities(
                 println!("POLYLINE");
                 svg = draw_polyline(svg, pol, transform);
             }
+            dxf::entities::EntityType::RotatedDimension(dim) => {
+                // println!("{:?}", dim);
+                println!("RotatedDimension: rotation_angle = {}", dim.rotation_angle);
+                println!(
+                    "attachment_point = {:?}",
+                    dim.dimension_base.attachment_point
+                );
+                let p1 = dim.dimension_base.definition_point_1.clone();
+                let p4 = dxf::Point {
+                    x: p1.x + (dim.definition_point_2.x - dim.definition_point_3.x),
+                    y: p1.y + (dim.definition_point_2.y - dim.definition_point_3.y),
+                    z: 0.0,
+                };
+                // svg = line_strip(
+                //     svg,
+                //     &[
+                //         transform(&dim.insertion_point),
+                //         transform(&dim.dimension_base.definition_point_1),
+                //     ],
+                // );
+                svg = line_strip(
+                    svg,
+                    &[
+                        transform(&dim.definition_point_2),
+                        transform(&p4),
+                        transform(&p1),
+                        transform(&dim.definition_point_3),
+                    ],
+                );
+            }
+            // dxf::entities::EntityType::RadialDimension(dim) => {
+            //     println!("{:?}", dim);
+            // }
+            // dxf::entities::EntityType::DiameterDimension(dim) => {
+            //     println!("{:?}", dim);
+            // }
+            // dxf::entities::EntityType::AngularThreePointDimension(dim) => {
+            //     println!("{:?}", dim);
+            // }
+            // dxf::entities::EntityType::OrdinateDimension(dim) => {
+            //     println!("{:?}", dim);
+            // }
             _ => (),
         }
     }
@@ -85,17 +137,7 @@ fn draw_line(
     line: &dxf::entities::Line,
     transform: impl Fn(&dxf::Point) -> dxf::Point,
 ) -> svg::Document {
-    let p1 = transform(&line.p1);
-    let p2 = transform(&line.p2);
-    let data = svg::node::element::path::Data::new()
-        .move_to((p1.x, p1.y))
-        .line_by((p2.x - p1.x, p2.y - p1.y));
-    let path = svg::node::element::Path::new()
-        .set("fill", "none")
-        .set("stroke", "black")
-        .set("stroke-width", 1)
-        .set("d", data);
-    svg.add(path)
+    line_strip(svg, &[transform(&line.p1), transform(&line.p2)])
 }
 
 fn draw_polyline(
@@ -108,13 +150,15 @@ fn draw_polyline(
         .iter()
         .map(|v| transform(&v.location))
         .collect::<Vec<_>>();
-    if points.len() >= 2 {
-        let data = (1..points.len())
-            .map(|i| (points[i].x - points[i - 1].x, points[i].y - points[i - 1].y))
-            .fold(
-                svg::node::element::path::Data::new().move_to((points[0].x, points[0].y)),
-                |data, v| data.line_by(v),
-            );
+    line_strip(svg, &points)
+}
+
+fn line_strip(svg: svg::Document, pol: &[dxf::Point]) -> svg::Document {
+    if pol.len() >= 2 {
+        let data = svg::node::element::path::Data::new().move_to((pol[0].x, pol[0].y));
+        let data = (1..pol.len())
+            .map(|i| (pol[i].x - pol[i - 1].x, pol[i].y - pol[i - 1].y))
+            .fold(data, |data, v| data.line_by(v));
         let path = svg::node::element::Path::new()
             .set("fill", "none")
             .set("stroke", "black")
