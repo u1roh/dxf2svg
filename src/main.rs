@@ -34,9 +34,6 @@ fn draw_entities(
 ) -> svg::Document {
     for e in entities {
         match &e.specific {
-            dxf::entities::EntityType::Line(line) => {
-                svg = draw_line(svg, line, transform);
-            }
             dxf::entities::EntityType::Insert(insert) => {
                 println!("INSERT: {}", insert.name);
                 println!("{:?}", insert);
@@ -58,11 +55,15 @@ fn draw_entities(
                     println!("block not found: name = {}", insert.name);
                 }
             }
+            dxf::entities::EntityType::Line(line) => {
+                svg = draw_line(svg, line, transform);
+            }
             dxf::entities::EntityType::Circle(circle) => {
                 println!("CIRCLE");
             }
             dxf::entities::EntityType::Polyline(pol) => {
                 println!("POLYLINE");
+                svg = draw_polyline(svg, pol, transform);
             }
             _ => (),
         }
@@ -86,4 +87,32 @@ fn draw_line(
         .set("stroke-width", 1)
         .set("d", data);
     svg.add(path)
+}
+
+fn draw_polyline(
+    svg: svg::Document,
+    pol: &dxf::entities::Polyline,
+    transform: impl Fn(&dxf::Point) -> dxf::Point,
+) -> svg::Document {
+    let points = pol
+        .vertices
+        .iter()
+        .map(|v| transform(&v.location))
+        .collect::<Vec<_>>();
+    if points.len() >= 2 {
+        let data = (1..points.len())
+            .map(|i| (points[i].x - points[i - 1].x, points[i].y - points[i - 1].y))
+            .fold(
+                svg::node::element::path::Data::new().move_to((points[0].x, points[0].y)),
+                |data, v| data.line_by(v),
+            );
+        let path = svg::node::element::Path::new()
+            .set("fill", "none")
+            .set("stroke", "black")
+            .set("stroke-width", 1)
+            .set("d", data);
+        svg.add(path)
+    } else {
+        svg
+    }
 }
