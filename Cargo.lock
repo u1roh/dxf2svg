@@ -171,6 +171,7 @@ checksum = "56899898ce76aaf4a0f24d914c97ea6ed976d42fec6ad33fcbb0a1103e07b2b0"
 [[package]]
 name = "dxf"
 version = "0.4.0"
+source = "git+https://github.com/u1roh/dxf-rs.git?branch=read-dimension-without-subclass-marker#ea71b9e7605b66bf54223441c9777e262436c229"
 dependencies = [
  "byteorder",
  "chrono",
