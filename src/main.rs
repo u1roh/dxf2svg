@@ -30,60 +30,72 @@ fn main() {
             .set("width", view_box.2 - view_box.0)
             .set("height", view_box.3 - view_box.1),
     );
-    svg = draw_entities(svg, &drawing.entities, &drawing, &|p| dxf::Point {
-        x: p.x,
-        y: 2.0 * view_box.1 + view_box.3 - p.y,
-        z: p.z,
-    });
+    for entity in drawing.entities() {
+        svg = draw_entity(svg, entity, &drawing, &|p| dxf::Point {
+            x: p.x,
+            y: 2.0 * view_box.1 + view_box.3 - p.y,
+            z: p.z,
+        });
+    }
     svg::save(args.value_of("svg").unwrap(), &svg).unwrap();
 }
 
-fn draw_entities(
+fn draw_entity(
     mut svg: svg::Document,
-    entities: &[dxf::entities::Entity],
+    entity: &dxf::entities::Entity,
     drawing: &dxf::Drawing,
     transform: &dyn Fn(&dxf::Point) -> dxf::Point,
 ) -> svg::Document {
-    for e in entities {
-        match &e.specific {
-            dxf::entities::EntityType::Insert(insert) => {
-                svg = draw_insert(svg, insert, drawing, transform);
-            }
-            dxf::entities::EntityType::Line(line) => {
-                svg = draw_line(svg, line, transform);
-            }
-            dxf::entities::EntityType::Circle(circle) => {
-                println!("CIRCLE");
-            }
-            dxf::entities::EntityType::Polyline(pol) => {
-                println!("POLYLINE");
-                svg = draw_polyline(svg, pol, transform);
-            }
-            dxf::entities::EntityType::RotatedDimension(dim) => {
-                svg = draw_rotated_dimension(svg, dim, transform);
-            }
-            _ => println!("{:?}", e.specific),
+    match &entity.specific {
+        dxf::entities::EntityType::Insert(insert) => {
+            svg = draw_insert(svg, insert, drawing, transform);
         }
+        dxf::entities::EntityType::Line(line) => {
+            svg = draw_line(svg, line, transform);
+        }
+        dxf::entities::EntityType::Circle(circle) => {
+            println!("CIRCLE");
+        }
+        dxf::entities::EntityType::Polyline(pol) => {
+            svg = draw_polyline(svg, pol, transform);
+        }
+        dxf::entities::EntityType::RotatedDimension(dim) => {
+            println!("RotatedDimension");
+            svg = draw_rotated_dimension(svg, dim, transform);
+        }
+        dxf::entities::EntityType::RadialDimension(RadialDimension) => {
+            println!("RadialDimension");
+        }
+        dxf::entities::EntityType::DiameterDimension(DiameterDimension) => {
+            println!("DiameterDimension");
+        }
+        dxf::entities::EntityType::AngularThreePointDimension(AngularThreePointDimension) => {
+            println!("AngularThreePointDimension");
+        }
+        dxf::entities::EntityType::OrdinateDimension(OrdinateDimension) => {
+            println!("OrdinateDimension");
+        }
+        dxf::entities::EntityType::LwPolyline(pol) => {
+            println!("LwPolyline");
+        }
+        dxf::entities::EntityType::Text(text) => {
+            println!("TEXT: {:?}", text.value);
+        }
+        dxf::entities::EntityType::MText(text) => {
+            println!("MTEXT: {:?}", text.text);
+        }
+        _ => println!("{:?}", entity.specific),
     }
     svg
 }
 
 fn draw_insert(
-    svg: svg::Document,
+    mut svg: svg::Document,
     insert: &dxf::entities::Insert,
     drawing: &dxf::Drawing,
     transform: impl Fn(&dxf::Point) -> dxf::Point,
 ) -> svg::Document {
-    println!("INSERT: {}", insert.name);
-    println!(
-        "scale_factor = ({}, {}, {})",
-        insert.x_scale_factor, insert.y_scale_factor, insert.z_scale_factor
-    );
-    if let Some(block) = drawing
-        .blocks
-        .iter()
-        .find(|block| block.name == insert.name)
-    {
+    if let Some(block) = drawing.blocks().find(|block| block.name == insert.name) {
         let (cos, sin) = {
             let theta = insert.rotation * std::f64::consts::PI / 180.0;
             (theta.cos(), theta.sin())
@@ -106,11 +118,13 @@ fn draw_insert(
             };
             transform(&p)
         };
-        draw_entities(svg, &block.entities, drawing, &transform)
+        for entity in &block.entities {
+            svg = draw_entity(svg, entity, drawing, &transform);
+        }
     } else {
         println!("block not found: name = {}", insert.name);
-        svg
     }
+    svg
 }
 
 fn draw_line(
@@ -118,6 +132,7 @@ fn draw_line(
     line: &dxf::entities::Line,
     transform: impl Fn(&dxf::Point) -> dxf::Point,
 ) -> svg::Document {
+    println!("draw_line");
     line_strip(svg, &[transform(&line.p1), transform(&line.p2)], None)
 }
 
@@ -126,9 +141,9 @@ fn draw_polyline(
     pol: &dxf::entities::Polyline,
     transform: impl Fn(&dxf::Point) -> dxf::Point,
 ) -> svg::Document {
+    println!("draw_polyline");
     let points = pol
-        .vertices
-        .iter()
+        .vertices()
         .map(|v| transform(&v.location))
         .collect::<Vec<_>>();
     line_strip(svg, &points, None)
