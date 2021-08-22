@@ -36,16 +36,25 @@ fn draw_entities(
         match &e.specific {
             dxf::entities::EntityType::Insert(insert) => {
                 println!("INSERT: {}", insert.name);
-                println!("{:?}", insert);
+                println!(
+                    "scale_factor = ({}, {}, {})",
+                    insert.x_scale_factor, insert.y_scale_factor, insert.z_scale_factor
+                );
                 if let Some(block) = drawing
                     .blocks
                     .iter()
                     .find(|block| block.name == insert.name)
                 {
+                    let (cos, sin) = {
+                        let theta = insert.rotation * std::f64::consts::PI / 180.0;
+                        (theta.cos(), theta.sin())
+                    };
                     let transform = |p: &dxf::Point| {
+                        let x = cos * p.x - sin * p.y;
+                        let y = sin * p.x + cos * p.y;
                         let p = dxf::Point {
-                            x: insert.location.x + p.x,
-                            y: insert.location.y + p.y,
+                            x: insert.location.x + x,
+                            y: insert.location.y + y,
                             z: insert.location.z + p.z,
                         };
                         transform(&p)
