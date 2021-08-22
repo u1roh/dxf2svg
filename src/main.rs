@@ -53,7 +53,7 @@ fn draw_entity(
         dxf::entities::EntityType::Line(line) => {
             svg = draw_line(svg, line, transform);
         }
-        dxf::entities::EntityType::Circle(circle) => {
+        dxf::entities::EntityType::Circle(_) => {
             println!("CIRCLE");
         }
         dxf::entities::EntityType::Polyline(pol) => {
@@ -63,19 +63,19 @@ fn draw_entity(
             println!("RotatedDimension");
             svg = draw_rotated_dimension(svg, dim, transform);
         }
-        dxf::entities::EntityType::RadialDimension(RadialDimension) => {
+        dxf::entities::EntityType::RadialDimension(_) => {
             println!("RadialDimension");
         }
-        dxf::entities::EntityType::DiameterDimension(DiameterDimension) => {
+        dxf::entities::EntityType::DiameterDimension(_) => {
             println!("DiameterDimension");
         }
-        dxf::entities::EntityType::AngularThreePointDimension(AngularThreePointDimension) => {
+        dxf::entities::EntityType::AngularThreePointDimension(_) => {
             println!("AngularThreePointDimension");
         }
-        dxf::entities::EntityType::OrdinateDimension(OrdinateDimension) => {
+        dxf::entities::EntityType::OrdinateDimension(_) => {
             println!("OrdinateDimension");
         }
-        dxf::entities::EntityType::LwPolyline(pol) => {
+        dxf::entities::EntityType::LwPolyline(_) => {
             println!("LwPolyline");
         }
         dxf::entities::EntityType::Text(text) => {
