@@ -18,7 +18,11 @@ fn main() {
             .set("width", view_box.2 - view_box.0)
             .set("height", view_box.3 - view_box.1),
     );
-    svg = draw_entities(svg, &drawing.entities, &drawing);
+    svg = draw_entities(svg, &drawing.entities, &drawing, |p| dxf::Point {
+        x: p.x,
+        y: 2.0 * view_box.1 + view_box.3 - p.y,
+        z: p.z,
+    });
     svg::save(args.value_of("svg").unwrap(), &svg).unwrap();
 }
 
@@ -26,11 +30,12 @@ fn draw_entities(
     mut svg: svg::Document,
     entities: &[dxf::entities::Entity],
     drawing: &dxf::Drawing,
+    transform: impl Fn(&dxf::Point) -> dxf::Point + Copy,
 ) -> svg::Document {
     for e in entities {
         match &e.specific {
             dxf::entities::EntityType::Line(line) => {
-                svg = draw_line(svg, line);
+                svg = draw_line(svg, line, transform);
             }
             dxf::entities::EntityType::Insert(insert) => {
                 println!("INSERT: {}", insert.name);
@@ -40,7 +45,7 @@ fn draw_entities(
                     .iter()
                     .find(|block| block.name == insert.name)
                 {
-                    svg = draw_entities(svg, &block.entities, drawing);
+                    svg = draw_entities(svg, &block.entities, drawing, transform);
                 } else {
                     println!("block not found: name = {}", insert.name);
                 }
@@ -57,10 +62,16 @@ fn draw_entities(
     svg
 }
 
-fn draw_line(svg: svg::Document, line: &dxf::entities::Line) -> svg::Document {
+fn draw_line(
+    svg: svg::Document,
+    line: &dxf::entities::Line,
+    transform: impl Fn(&dxf::Point) -> dxf::Point,
+) -> svg::Document {
+    let p1 = transform(&line.p1);
+    let p2 = transform(&line.p2);
     let data = svg::node::element::path::Data::new()
-        .move_to((line.p1.x, line.p1.y))
-        .line_by((line.p2.x - line.p1.x, line.p2.y - line.p1.y));
+        .move_to((p1.x, p1.y))
+        .line_by((p2.x - p1.x, p2.y - p1.y));
     let path = svg::node::element::Path::new()
         .set("fill", "none")
         .set("stroke", "black")
