@@ -18,7 +18,7 @@ fn main() {
             .set("width", view_box.2 - view_box.0)
             .set("height", view_box.3 - view_box.1),
     );
-    svg = draw_entities(svg, &drawing.entities, &drawing, |p| dxf::Point {
+    svg = draw_entities(svg, &drawing.entities, &drawing, &|p| dxf::Point {
         x: p.x,
         y: 2.0 * view_box.1 + view_box.3 - p.y,
         z: p.z,
@@ -30,7 +30,7 @@ fn draw_entities(
     mut svg: svg::Document,
     entities: &[dxf::entities::Entity],
     drawing: &dxf::Drawing,
-    transform: impl Fn(&dxf::Point) -> dxf::Point + Copy,
+    transform: &dyn Fn(&dxf::Point) -> dxf::Point,
 ) -> svg::Document {
     for e in entities {
         match &e.specific {
@@ -45,7 +45,15 @@ fn draw_entities(
                     .iter()
                     .find(|block| block.name == insert.name)
                 {
-                    svg = draw_entities(svg, &block.entities, drawing, transform);
+                    let transform = |p: &dxf::Point| {
+                        let p = dxf::Point {
+                            x: insert.location.x + p.x,
+                            y: insert.location.y + p.y,
+                            z: insert.location.z + p.z,
+                        };
+                        transform(&p)
+                    };
+                    svg = draw_entities(svg, &block.entities, drawing, &transform);
                 } else {
                     println!("block not found: name = {}", insert.name);
                 }
