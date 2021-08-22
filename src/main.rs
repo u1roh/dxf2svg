@@ -39,42 +39,7 @@ fn draw_entities(
     for e in entities {
         match &e.specific {
             dxf::entities::EntityType::Insert(insert) => {
-                println!("INSERT: {}", insert.name);
-                println!(
-                    "scale_factor = ({}, {}, {})",
-                    insert.x_scale_factor, insert.y_scale_factor, insert.z_scale_factor
-                );
-                if let Some(block) = drawing
-                    .blocks
-                    .iter()
-                    .find(|block| block.name == insert.name)
-                {
-                    let (cos, sin) = {
-                        let theta = insert.rotation * std::f64::consts::PI / 180.0;
-                        (theta.cos(), theta.sin())
-                    };
-                    let transform = |p: &dxf::Point| {
-                        let p = dxf::Point {
-                            x: insert.x_scale_factor * p.x,
-                            y: insert.y_scale_factor * p.y,
-                            z: insert.z_scale_factor * p.z,
-                        };
-                        let p = dxf::Point {
-                            x: cos * p.x - sin * p.y,
-                            y: sin * p.x + cos * p.y,
-                            z: p.z,
-                        };
-                        let p = dxf::Point {
-                            x: insert.location.x + p.x,
-                            y: insert.location.y + p.y,
-                            z: insert.location.z + p.z,
-                        };
-                        transform(&p)
-                    };
-                    svg = draw_entities(svg, &block.entities, drawing, &transform);
-                } else {
-                    println!("block not found: name = {}", insert.name);
-                }
+                svg = draw_insert(svg, insert, drawing, transform);
             }
             dxf::entities::EntityType::Line(line) => {
                 svg = draw_line(svg, line, transform);
@@ -93,6 +58,51 @@ fn draw_entities(
         }
     }
     svg
+}
+
+fn draw_insert(
+    svg: svg::Document,
+    insert: &dxf::entities::Insert,
+    drawing: &dxf::Drawing,
+    transform: impl Fn(&dxf::Point) -> dxf::Point,
+) -> svg::Document {
+    println!("INSERT: {}", insert.name);
+    println!(
+        "scale_factor = ({}, {}, {})",
+        insert.x_scale_factor, insert.y_scale_factor, insert.z_scale_factor
+    );
+    if let Some(block) = drawing
+        .blocks
+        .iter()
+        .find(|block| block.name == insert.name)
+    {
+        let (cos, sin) = {
+            let theta = insert.rotation * std::f64::consts::PI / 180.0;
+            (theta.cos(), theta.sin())
+        };
+        let transform = |p: &dxf::Point| {
+            let p = dxf::Point {
+                x: insert.x_scale_factor * p.x,
+                y: insert.y_scale_factor * p.y,
+                z: insert.z_scale_factor * p.z,
+            };
+            let p = dxf::Point {
+                x: cos * p.x - sin * p.y,
+                y: sin * p.x + cos * p.y,
+                z: p.z,
+            };
+            let p = dxf::Point {
+                x: insert.location.x + p.x,
+                y: insert.location.y + p.y,
+                z: insert.location.z + p.z,
+            };
+            transform(&p)
+        };
+        draw_entities(svg, &block.entities, drawing, &transform)
+    } else {
+        println!("block not found: name = {}", insert.name);
+        svg
+    }
 }
 
 fn draw_line(
